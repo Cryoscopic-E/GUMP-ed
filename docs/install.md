@@ -1,79 +1,72 @@
 # Installation
 
-To make usage easier, we have prepared a Docker image. Download it from the following link:  
-[Download Docker Image](https://storage.googleapis.com/93935945854-us-central1-blueprint-config/hoplan_py39-cu121-pt230-gcc9-devel-nocudnn-wm.tar)
+Two environments share one dependency spec (`pyproject.toml` + `uv.lock`):
 
-## Using Docker
+- **dev machine**: plain `uv` virtualenv, for editing and quick runs.
+- **GPU server**: Docker image with the same dependencies; the repo checkout is mounted, not baked in.
 
-1. Load the image:
-   ```bash
-   docker load -i IMAGE_DOWNLOAD_PATH
-   ```
+`third_party/nuplan-devkit` (branch `feat-v1.3_gump`) and `third_party/alf` are git submodules pinned to exact commits.
 
-2. Edit the Docker mount point:
-   Update the mount point in `./docker/docker_run.sh` as needed.
+## Clone
 
-3. Run the Docker container:
-   ```bash
-   sh ./docker/docker_run.sh
-   ```
+```bash
+git clone --recursive <this repo>
+# already cloned: git submodule update --init
+ln -s /path/to/nuplan data   # must contain maps/ and nuplan-v1.1/splits/{mini,train,val,...}
+```
 
-## Install Nuplan Devkit
+## Dev machine (uv)
 
-1. Navigate to the `third_party` directory:
-   ```bash
-   cd GUMP/third_party
-   ```
+```bash
+sudo apt install -y libboost-dev   # needed to build ALF's C++ extension
+uv sync                            # python 3.9, torch 2.3.0+cu121
+```
 
-2. Clone the Nuplan Devkit repository:
-   ```bash
-   git clone --branch feat-v1.3_gump git@github.com:HorizonRobotics/nuplan-devkit.git
-   ```
+Smoke test on the mini split (outputs in `exp/`):
 
-3. Install the Nuplan Devkit:
-   ```bash
-   cd nuplan-devkit
-   pip install -e .
-   ```
+```bash
+bash scripts/preprocess/cache_nuplan.sh
+bash scripts/training/train_nuplan.sh
+```
 
-4. Set the `NUPLAN_DEVKIT_PATH` environment variable:
-   ```bash
-   export NUPLAN_DEVKIT_PATH=$YOUR_PATH_TO_GUMP/GUMP/third_party/nuplan-devkit
-   ```
-5. install following packages:
-   ```bash
-   pip install aiofiles aioboto3 flatdict adjustText loralib easydict einops_exts
-   pip install waymo-open-dataset-tf-2-12-0==1.6.4
-   ``` 
+## GPU server (Docker)
 
-## Install ALF
+Requires Docker with nvidia-container-toolkit (`docker run --gpus all ...` works) and an NVIDIA driver >= 530.
 
-Follow these steps to install ALF while ignoring the dependencies of torch:
+```bash
+git pull && git submodule update --init
+docker build -f docker/Dockerfile -t gump .   # only needed when pyproject.toml / uv.lock / third_party change
+docker/run.sh bash scripts/preprocess/cache_nuplan.sh   # mini smoke test
+docker/run.sh bash scripts/training/train_nuplan.sh
+```
 
-1. Navigate to the `third_party` directory:
+`docker/run.sh` mounts the repo, the data dir (`$NUPLAN_DATA_ROOT`, default `./data` with symlinks resolved) and the
+output dir (`$NUPLAN_EXP_ROOT`, default `./exp`) at their host paths, and runs as your user so outputs are not root-owned.
 
-    ```bash
-    cd GUMP/third_party
-    ```
+Full training (detached, survives logout):
 
-2. Clone the ALF repository:
+```bash
+SPLITS=train,val NUM_SCENARIOS_PER_TYPE=null MAX_WORKERS=32 \
+    nohup docker/run.sh bash scripts/preprocess/cache_nuplan.sh > exp/cache_train_val.log 2>&1 &
+SPLITS=train,val MAX_EPOCHS=15 \
+    nohup docker/run.sh bash scripts/training/train_nuplan.sh > exp/train_train_val.log 2>&1 &
+tensorboard --logdir exp/save_dir
+```
 
-    ```bash
-    git clone https://github.com/HorizonRobotics/alf.git
-    ```
+## Script knobs
 
-3. Edit the `setup.py` file to ignore the dependencies of torch:
+Both scripts read these environment variables (forwarded into the container by `docker/run.sh`). Extra arguments are passed
+to hydra, e.g. `bash scripts/training/train_nuplan.sh lightning.trainer.params.limit_val_batches=2`.
 
-    Comment out lines 52, 53, and 54 in the `setup.py` file:
+| Variable | Default | Meaning |
+|---|---|---|
+| `SPLITS` | `mini` | comma-separated dirs under `nuplan-v1.1/splits/` |
+| `CACHE_NAME` | `cache_<splits>` | cache dir under `$NUPLAN_EXP_ROOT` |
+| `NUM_SCENARIOS_PER_TYPE` | `10` | caching filter; `null` = all scenarios |
+| `MAX_WORKERS` | `16` | caching processes |
+| `MODEL` | `gump_nuplan_llama_sm_v1_1` | model config |
+| `EXPERIMENT` | `train_<splits>` | experiment name under `exp/save_dir` |
+| `MAX_EPOCHS` / `BATCH_SIZE` / `NUM_WORKERS` | `2` / `4` / `8` | training |
+| `CKPT_PATH` | `null` | checkpoint to initialise from |
 
-    ```python
-    # 'torch==2.2.0',
-    # 'torchvision==0.17.0',
-    # 'torchtext==0.17.0',
-    ```
-
-4. Install ALF:
-
-    ```bash
-    pip install -e .
-    ```
+Cache metadata stores absolute paths, so a cache made on one machine is only valid where the same paths exist.

@@ -1,0 +1,7 @@
+[submodule "third_party/nuplan-devkit"]
+	path = third_party/nuplan-devkit
+	url = https://github.com/HorizonRobotics/nuplan-devkit.git
+	branch = feat-v1.3_gump
+[submodule "third_party/alf"]
+	path = third_party/alf
+	url = https://github.com/HorizonRobotics/alf.git

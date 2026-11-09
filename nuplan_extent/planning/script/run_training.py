@@ -19,8 +19,12 @@ from nuplan.planning.training.experiments.training import (
     TrainingEngine, build_training_engine)
 from omegaconf import DictConfig, OmegaConf
 import cv2
+import yaml
 
 cv2.setNumThreads(1)
+# torchmetrics Metric hparams hold a torch.dtype, whose __reduce__ returns a bare string that
+# PyYAML cannot represent (ValueError, not skipped by lightning's hparams dump). Dump it as a string.
+yaml.add_representer(torch.dtype, lambda dumper, d: dumper.represent_str(str(d)))
 warnings.filterwarnings("ignore")
 
 torch.multiprocessing.set_sharing_strategy('file_system')

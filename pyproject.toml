@@ -1,0 +1,101 @@
+[project]
+name = "gump"
+version = "1.1.0"
+description = "GUMP: Solving Motion Planning Tasks with a Scalable Generative Model"
+requires-python = "==3.9.*"
+dependencies = [
+    # core (versions from the original docker image: py39 / cu121 / torch 2.3.0)
+    "torch==2.3.0",
+    "torchvision==0.18.0",
+    "pytorch-lightning==2.2.5",
+    "setuptools<81",  # lightning 2.2.5 imports pkg_resources
+    "torchmetrics",
+    "timm",
+    "triton",
+    "numba==0.58.1",
+    "numpy==1.23.4",
+    "einops",
+    "einops-exts",
+    "easydict",
+    "loralib",
+    "transformers",
+    "tensorboard",
+    "adjustText",
+    "flatdict",
+    "imageio",
+    "moviepy<2",  # torch add_video imports moviepy.editor
+    # local editable third-party code
+    "nuplan-devkit",
+    "alf",
+    # nuplan-devkit runtime requirements (third_party/nuplan-devkit/requirements.txt, dev tooling dropped)
+    "aioboto3",
+    "aiofiles",
+    "bokeh==2.4.2",
+    "boto3",
+    "cachetools",
+    "casadi",
+    "control==0.9.1",
+    "Fiona",
+    "geopandas>=0.12.1",
+    "guppy3",
+    "hydra-core==1.3.2",
+    "hydra-colorlog",
+    "joblib",
+    "matplotlib",
+    "nest_asyncio",
+    "opencv-python<=4.5.1.48",
+    "pandas",
+    "Pillow",
+    "protobuf==3.20.1",
+    "psutil",
+    "pyarrow",
+    "pyinstrument",
+    "pyogrio",
+    "pyquaternion>=0.9.5",
+    "rasterio",
+    "ray",
+    "requests",
+    "retry",
+    "rtree",
+    "s3fs",
+    "scikit-learn",
+    "scipy",
+    "selenium",
+    "Shapely>=2.0.0",
+    "SQLAlchemy==1.4.27",
+    "sympy",
+    "tornado",
+    "tqdm",
+    "typer",
+    "ujson",
+    # alf runtime requirements (alf's own pins conflict with nuplan-devkit, see dependency-metadata below)
+    "absl-py",
+    "cnest",
+    "fasteners",
+    "gym==0.15.4",
+    "gin-config @ git+https://github.com/HorizonRobotics/gin-config.git",
+    "pytest",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.extra-build-dependencies]
+flatdict = ["setuptools<81"]  # its setup.py imports pkg_resources
+
+[tool.uv.sources]
+nuplan-devkit = { path = "third_party/nuplan-devkit", editable = true }
+alf = { path = "third_party/alf", editable = true }  # builds a C++ extension: needs libboost-dev
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+# alf pins torch 2.2 / numpy 1.26 / atari / pybullet...; GUMP only needs its config system and layers.
+[[tool.uv.dependency-metadata]]
+name = "alf"
+version = "0.1.0"
+requires-dist = []

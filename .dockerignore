@@ -1,0 +1,12 @@
+# The image only needs the dependency spec and third_party sources (code is mounted at run time).
+*
+!pyproject.toml
+!uv.lock
+!third_party/nuplan-devkit
+!third_party/alf
+**/.git
+**/__pycache__
+third_party/alf/build
+third_party/alf/*.egg-info
+third_party/alf/**/*.so
+third_party/nuplan-devkit/*.egg-info
